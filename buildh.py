@@ -70,7 +70,7 @@ class buildh:
         self.d1m = 0    # \Delta_{1,-}
         self.d2m = 0    # \Delta_{2,-}
         self.d3m = 0    # \Delta_{3,-}
-        # nn inter-valley
+        # nn intra-valley
         self.d1p_ = 0    # \Delta_{1,+}'
         self.d2p_ = 0    # \Delta_{2,+}'
         self.d3p_ = 0    # \Delta_{3,+}'
@@ -112,6 +112,7 @@ class buildh:
             # reshape k points as a 1d-array
             return KX.reshape((Nx*Ny,)), KY.reshape((Nx*Ny,))
         self.kx, self.ky = buildBZ(Nx)
+        self.NN = len(self.kx)
 
         """
         Create arrays with various phase factors
@@ -227,11 +228,76 @@ class buildh:
 
     def eval_meanfields(self):
         """
-        *** TODO ***
         This function diagonalizes the Hamiltonian and uses the eigenvectors
         to evaluate the expectation values to calculate all meanfields (Eq. 36-39 in notes)
+        at zero temperature
         """
-        print('TODO')
+        def expectL(S, i, j):
+            x = np.sum(S[i+4, 0:4].conj() * S[j,0:4])
+            return x 
+        def expectR(S, i, j):
+            x = np.sum(S[i, 4:8] * S[j+4,4:8].conj())
+            return x 
+        
+        # onsite inter-valley
+        dAk = np.zeros(self.NN, dtype='complex128')     # \Delta_{A}
+        dBk = np.zeros(self.NN, dtype='complex128')     # \Delta_{B}
+        # onsite intra-valley
+        dApk_ = np.zeros(self.NN, dtype='complex128')   # \Delta_{A,+}'
+        dAmk_ = np.zeros(self.NN, dtype='complex128')   # \Delta_{A,-}'
+        dBpk_ = np.zeros(self.NN, dtype='complex128')   # \Delta_{B,+}'
+        dBmk_ = np.zeros(self.NN, dtype='complex128')   # \Delta_{B,-}'
+        # nn inter-valley
+        a_plus = np.zeros(self.NN, dtype='complex128')
+        a_minus = np.zeros(self.NN, dtype='complex128')
+        b_plus = np.zeros(self.NN, dtype='complex128')
+        b_minus = np.zeros(self.NN, dtype='complex128')
+        # nn intra-valley
+        a_plus_ = np.zeros(self.NN, dtype='complex128')
+        a_minus_ = np.zeros(self.NN, dtype='complex128')
+        b_plus_ = np.zeros(self.NN, dtype='complex128')
+        b_minus_ = np.zeros(self.NN, dtype='complex128')
+        for i in np.arange(self.NN):
+            ev, S = np.linalg.eigh(self.H[:,:,i])
+            dAk[i] = expectR(S, 2, 0) - expectL(S, 2, 0)
+            dBk[i] = expectR(S, 3, 1) - expectL(S, 3, 1)
+
+            dApk_[i] = expectL(S, 0, 0)
+            dBpk_[i] = expectL(S, 1, 1)
+            dAmk_[i] = expectL(S, 2, 2)
+            dBmk_[i] = expectL(S, 3, 3)
+
+            a_plus[i] = expectR(S, 3, 0)
+            b_plus[i] = expectL(S, 3, 0)
+            a_minus[i] = expectR(S, 1, 2)
+            b_minus[i] = expectL(S, 1, 2)
+
+            a_plus_[i] = expectR(S, 1, 0)
+            b_plus_[i] = expectL(S, 1, 0)
+            a_minus_[i] = expectR(S, 3, 2)
+            b_minus_[i] = expectL(S, 3, 2)
+
+        self.dA = self.U/2 * np.mean(dAk)
+        self.dB = self.U/2 * np.mean(dBk)
+
+        self.dAp_ = -self.U_ * np.mean(dApk_)
+        self.dBp_ = -self.U_ * np.mean(dBpk_)
+        self.dAm_ = -self.U_ * np.mean(dAmk_)
+        self.dBm_ = -self.U_ * np.mean(dBmk_)
+
+        self.d1p = self.V/2 * np.mean(a_plus * self.__exp_kr1 - b_plus * self.__exp_nkr1)
+        self.d2p = self.V/2 * np.mean(a_plus * self.__exp_kr2 - b_plus * self.__exp_nkr2)
+        self.d3p = self.V/2 * np.mean(a_plus * self.__exp_kr3 - b_plus * self.__exp_nkr3)
+        self.d1m = self.V/2 * np.mean(a_minus * self.__exp_kr1 - b_minus * self.__exp_nkr1)
+        self.d2m = self.V/2 * np.mean(a_minus * self.__exp_kr2 - b_minus * self.__exp_nkr2)
+        self.d3m = self.V/2 * np.mean(a_minus * self.__exp_kr3 - b_minus * self.__exp_nkr3)
+
+        self.d1p_ = self.V_/2 * np.mean(a_plus_ * self.__exp_kr1 - b_plus_ * self.__exp_nkr1)
+        self.d2p_ = self.V_/2 * np.mean(a_plus_ * self.__exp_kr2 - b_plus_ * self.__exp_nkr2)
+        self.d3p_ = self.V_/2 * np.mean(a_plus_ * self.__exp_kr3 - b_plus_ * self.__exp_nkr3)
+        self.d1m_ = self.V_/2 * np.mean(a_minus_ * self.__exp_kr1 - b_minus_ * self.__exp_nkr1)
+        self.d2m_ = self.V_/2 * np.mean(a_minus_ * self.__exp_kr2 - b_minus_ * self.__exp_nkr2)
+        self.d3m_ = self.V_/2 * np.mean(a_minus_ * self.__exp_kr3 - b_minus_ * self.__exp_nkr3)
 
     def bandstructure(self, res=100):
         """
@@ -280,3 +346,7 @@ class buildh:
         plt.xlim(np.min(path),np.max(path))
         plt.ylim((-5,5))
         plt.legend()
+
+tbg = buildh(10)
+tbg.bandstructure()
+tbg.eval_meanfields()
