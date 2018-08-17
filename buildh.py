@@ -346,7 +346,13 @@ class buildh:
         plt.xlim(np.min(path),np.max(path))
         plt.ylim((-5,5))
         plt.legend()
-
-tbg = buildh(10)
-tbg.bandstructure()
-tbg.eval_meanfields()
+    def plotBZ(self):
+        """
+        shows a scatter-plot of all point in the Brillouin zone
+        """
+        plt.figure()
+        plt.ion()
+        plt.scatter(self.kx/pi, self.ky/pi)
+        plt.axis('equal')
+        plt.xlabel('$k_x/\pi$')
+        plt.ylabel('$k_y/\pi$')
